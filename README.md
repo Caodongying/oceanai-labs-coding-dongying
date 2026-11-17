@@ -12,7 +12,7 @@ Docker with `docker compose` is required.
 ./scripts/seed-large.sh --tenant east --count 100000
 ```
 
-`dev.sh` builds and starts the stack, migrates the database, and seeds small default data. It is safe to rerun. The API is at <http://localhost:8080/api/v1>; when the frontend is present, the UI is at <http://localhost:3000>. Stop with `docker compose --profile ui down`. Add `-v` to that command only to delete the database volume. `test.sh` currently verifies builds; automated tests are deferred for this MVP. The large seed script invokes the backend's `seed-large` command and fills the selected tenant to **100,000 total certificates**, without adding rows on repeated runs.
+`dev.sh` builds and starts the stack, migrates the database, and seeds small default data. It is safe to rerun. The API is at <http://localhost:8080/api/v1>; when the frontend is present, the UI is at <http://localhost:3000>. If port 8080 is occupied, set `API_PORT=18080` for `dev.sh` and `test.sh`, and use that port in API requests. Stop with `docker compose --profile ui down`. Add `-v` to that command only to delete the database volume. `test.sh` starts the stack, runs backend tests and vet in Docker, runs frontend checks when present, and makes API smoke requests. The large seed script invokes the backend's `seed-large` command and fills the selected tenant to **100,000 total certificates**, without adding rows on repeated runs.
 
 For direct backend development: `cd backend && go run ./cmd/server`. Set `DB_PATH` to choose the SQLite file.
 
@@ -21,7 +21,7 @@ For direct backend development: `cd backend && go run ./cmd/server`. Set `DB_PAT
 The public `GET /api/v1/demo/admins` returns the two actors. Protected requests need `X-Admin-Email: alice@east.test` or `bob@west.test`. Tenant IDs in paths are checked against the actor's database record.
 
 ```sh
-API=http://localhost:8080/api/v1
+API=http://localhost:${API_PORT:-8080}/api/v1
 curl "$API/demo/admins"
 curl -H 'X-Admin-Email: alice@east.test' "$API/me"
 curl -H 'X-Admin-Email: alice@east.test' "$API/tenants/east/courses"
@@ -71,7 +71,7 @@ time curl -sS -H 'X-Admin-Email: alice@east.test' "$API/tenants/east/certificate
 curl -H 'X-Admin-Email: alice@east.test' "$API/tenants/east/certificates?search=Demo%20Learner%20001&sort_by=learner_name&sort_dir=asc"
 wait
 time curl -sS -H 'X-Admin-Email: alice@east.test' "$API/tenants/east/certificates/export?search=Demo%20Learner%20001&sort_by=learner_name&sort_dir=asc" -o /tmp/east-2.csv
-cmp /tmp/east-1.csv /tmp/east-2.csv
+python3 -c "import csv; a=list(csv.reader(open('/tmp/east-1.csv'))); b=list(csv.reader(open('/tmp/east-2.csv'))); assert a==b and len(a)==401; print('400 matching rows in stable order')"
 ```
 
 **A7 — revoke once.** On a fresh database, the first response is `revoked`, the second `already_revoked`, and detail stays revoked. The database permits only one `revoked` audit event per certificate.

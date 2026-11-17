@@ -5,6 +5,9 @@ RUN go mod download
 COPY . .
 RUN CGO_ENABLED=0 go build -o /server ./cmd/server
 
+FROM build AS test
+RUN go test ./... && go vet ./...
+
 FROM alpine:3.22
 RUN apk add --no-cache ca-certificates tzdata
 COPY --from=build /server /server

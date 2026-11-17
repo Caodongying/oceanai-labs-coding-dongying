@@ -1,6 +1,7 @@
 package app
 
 import (
+	"bytes"
 	"crypto/rand"
 	"crypto/sha256"
 	"database/sql"
@@ -99,7 +100,15 @@ func decodeBody(c *gin.Context, dst any) error {
 	if c.ContentType() != "application/json" {
 		return errors.New("content type")
 	}
-	dec := json.NewDecoder(io.LimitReader(c.Request.Body, 1<<20))
+	raw, err := io.ReadAll(io.LimitReader(c.Request.Body, 1<<20))
+	if err != nil {
+		return err
+	}
+	trimmed := bytes.TrimSpace(raw)
+	if len(trimmed) == 0 || trimmed[0] != '{' {
+		return errors.New("JSON object required")
+	}
+	dec := json.NewDecoder(bytes.NewReader(trimmed))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(dst); err != nil {
 		return err
